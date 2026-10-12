@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motion Lab</title>
+<style>
+:root{--bg:#fafaf7;--card:#ffffff;--text:#1f1e1b;--muted:#6b6a65;--line:#d9d7cf;--ramp:#8a877e;--car:#2f6fd6;--x:#2f6fd6;--v:#14946b;--a:#d2572c}
+@media (prefers-color-scheme: dark){:root{--bg:#1b1b19;--card:#252523;--text:#ecebe6;--muted:#a3a29b;--line:#3d3c38;--ramp:#8f8c83;--car:#5b97f0;--x:#5b97f0;--v:#3cc495;--a:#ef8159}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.5}
+main{max-width:980px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 16px;font-size:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+canvas{width:100%;display:block}
+#scene{cursor:grab;touch-action:none}
+.seg{display:flex;gap:0}
+.seg button{font-size:13px;white-space:nowrap;padding:6px 10px;border-radius:0;flex:1}
+.seg button:first-child{border-radius:8px 0 0 8px}
+.seg button:last-child{border-radius:0 8px 8px 0;border-left:none}
+.seg button.on{background:var(--car);border-color:var(--car);color:#fff}
+.tabs{max-width:380px;margin:0 0 12px}
+.tabs button{font-size:15px;padding:8px 14px}
+.ctrl{display:grid;grid-template-columns:150px 1fr minmax(70px,auto);align-items:center;gap:10px;margin:8px 0;font-size:14px}
+.ctrl span{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.ctrl .lbl{text-align:left;font-weight:400;white-space:normal}
+.hint{font-size:12px;color:var(--muted);margin:-4px 0 4px 160px}
+input[type=range]{width:100%}
+.btns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+button{font:inherit;font-size:15px;padding:8px 18px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+button.held{background:var(--a);border-color:var(--a);color:#fff}
+button.primary{background:var(--car);border-color:var(--car);color:#fff}
+.readout{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.m{background:var(--bg);border-radius:8px;padding:8px 10px}
+.m b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.m small{color:var(--muted);font-size:12px}
+.gl{font-size:13px;color:var(--muted);margin:6px 0 2px;display:flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.note{margin-top:12px;font-size:14px;background:var(--bg);border-radius:8px;padding:10px 12px}
+@media (max-width:520px){.ctrl{grid-template-columns:110px 1fr minmax(60px,auto)}.hint{margin-left:120px}}
+</style>
+</head>
+<body>
+<main>
+<div class="seg tabs"><button id="mRamp" class="on">Car on a ramp</button><button id="mFall">Free fall</button></div>
+<h1 id="title">Car on a ramp (no friction)</h1>
+<p class="sub" id="sub"></p>
+<div class="grid">
+  <section class="card">
+    <canvas id="scene" height="300"></canvas>
+
+    <div class="rampOnly">
+      <div class="ctrl"><label for="ang">Slope angle</label><input id="ang" type="range" min="0" max="30" step="1" value="10"><span id="angOut">10°</span></div>
+      <div class="ctrl"><span class="lbl">Push direction</span><div class="seg"><button id="dirUp" class="on">Up the ramp</button><button id="dirDown">Down the ramp</button></div><span></span></div>
+      <div class="ctrl"><label for="push">Push strength</label><input id="push" type="range" min="0" max="3" step="0.1" value="2"><span id="pushOut">2.0 m/s</span></div>
+      <div id="pushMax" class="hint"></div>
+      <div class="ctrl"><label for="x0">Start position</label><input id="x0" type="range" min="0.1" max="1.9" step="0.05" value="0.2"><span id="x0Out">0.20 m</span></div>
+      <div class="ctrl"><span class="lbl">Positive x direction</span><div class="seg"><button id="axUp" class="on">Uphill</button><button id="axDown">Downhill</button></div><span></span></div>
+      <div class="ctrl"><label for="org">Origin (x = 0)</label><input id="org" type="range" min="0" max="2" step="0.05" value="0"><span id="orgOut" style="font-size:12px">bottom</span></div>
+    </div>
+
+    <div class="fallOnly" style="display:none">
+      <div class="ctrl"><label for="fH">Release height</label><input id="fH" type="range" min="0" max="20" step="0.5" value="15"><span id="fHOut">15.0 m</span></div>
+      <div class="ctrl"><span class="lbl">Throw direction</span><div class="seg"><button id="fDirUp" class="on">Up</button><button id="fDirDown">Down</button></div><span></span></div>
+      <div class="ctrl"><label for="fPush">Throw speed</label><input id="fPush" type="range" min="0" max="15" step="0.5" value="10"><span id="fPushOut">10.0 m/s</span></div>
+      <div id="fPushMax" class="hint"></div>
+      <div class="ctrl"><span class="lbl">Positive y direction</span><div class="seg"><button id="fAxUp" class="on">Up</button><button id="fAxDown">Down</button></div><span></span></div>
+      <div class="ctrl"><label for="fOrg">Origin (y = 0)</label><input id="fOrg" type="range" min="0" max="30" step="0.5" value="0"><span id="fOrgOut" style="font-size:12px">ground</span></div>
+    </div>
+
+    <div class="ctrl" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)"><label for="tmax">Experiment time</label><input id="tmax" type="range" min="1" max="20" step="1" value="5"><span id="tmaxOut">5 s</span></div>
+    <div class="btns"><button class="primary" id="go">Push</button><button id="hold" disabled>Hold still</button><button id="reset">Reset</button><button id="orgCar">Set origin at car</button></div>
+    <div class="readout">
+      <div class="m"><small>Time</small><b id="rt">0.00 s</b></div>
+      <div class="m"><small>Position</small><b id="rx">0.00 m</b></div>
+      <div class="m"><small>Velocity</small><b id="rv">0.00 m/s</b></div>
+      <div class="m"><small>Accel.</small><b id="ra">0.00 m/s²</b></div>
+    </div>
+    <div class="note" id="note"></div>
+  </section>
+  <section class="card">
+    <div class="gl"><span class="dot" style="background:var(--x)"></span><span id="glx">Position x (m) vs time</span></div>
+    <canvas id="gx" height="150"></canvas>
+    <div class="gl"><span class="dot" style="background:var(--v)"></span>Velocity v (m/s) vs time</div>
+    <canvas id="gv" height="150"></canvas>
+    <div class="gl"><span class="dot" style="background:var(--a)"></span>Acceleration a (m/s²) vs time</div>
+    <canvas id="ga" height="150"></canvas>
+  </section>
+</div>
+</main>
+<script>
+const g=9.8; let TMAX=5;
+const $=id=>document.getElementById(id);
+const C={
+  ramp:{L:2,TOP:1.94,cap:3,ax:"x",obj:"car",h:300,rx:2,rv:4,ra:6,up:"uphill",down:"downhill",
+        x0:"x0",push:"push",pushMax:"pushMax",org:"org",orgOut:"orgOut",dirU:"dirUp",dirD:"dirDown",axU:"axUp",axD:"axDown",orgStep:0.05,
+        title:"Car on a ramp (no friction)",
+        sub:"Drag the car (or click the ramp) to place it, set the slope and push, then press Push. Choose which way +x points and where the origin is."},
+  fall:{L:30,TOP:30,cap:15,ax:"y",obj:"ball",h:400,rx:30,rv:30,ra:12,up:"up",down:"down",
+        x0:"fH",push:"fPush",pushMax:"fPushMax",org:"fOrg",orgOut:"fOrgOut",dirU:"fDirUp",dirD:"fDirDown",axU:"fAxUp",axD:"fAxDown",orgStep:0.5,
+        title:"Free fall (no air resistance)",
+        sub:"Drag the ball up or down to set the release height. Throw speed 0 just drops it; slide it up and pick Up to throw the ball upward. Choose which way +y points and where the origin is."}
+};
+const S={ramp:{dir:1,origin:0,sgn:1},fall:{dir:1,origin:0,sgn:1}};
+let mode="ramp";
+const cf=()=>C[mode], P=()=>S[mode];
+let st={t:0,x:0.2,v:0,a:0,run:false,data:[],done:""};
+const rel=s=>P().sgn*(s-P().origin);
+const f2=n=>(Math.abs(n)<0.005?0:n).toFixed(2);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function setup(c,hh){if(!c.dataset.h)c.dataset.h=c.getAttribute("height");const h=hh||+c.dataset.h,w=c.clientWidth,r=window.devicePixelRatio||1;c.width=w*r;c.height=h*r;c.style.height=h+"px";const k=c.getContext("2d");k.setTransform(r,0,0,r,0,0);return [k,w,h]}
+const ang=()=>+$("ang").value*Math.PI/180;
+const accel=()=>mode==="ramp"?-g*Math.sin(ang()):-g;
+let geo=null;
+
+function legend(k,w,y){y=y||18;k.font="12px system-ui";k.fillStyle=css("--v");k.fillText("green arrow = velocity",w-160,y);k.fillStyle=css("--a");k.fillText("orange arrow = acceleration",w-160,y+16);}
+
+function drawRamp(){
+  const L=cf().L,p0=P();
+  const [k,w,h]=setup($("scene"),cf().h);const th=ang();
+  const len=Math.min(w-60,(h-140)/Math.max(Math.sin(th),0.001));const tl=Math.min(len,w-60);
+  const x0=30,y0=h-72,x1=x0+tl*Math.cos(th),y1=y0-tl*Math.sin(th);
+  geo={mode:"ramp",x0,y0,tl,th};
+  const at=m=>{const p=m/L*tl;return [x0+p*Math.cos(th),y0-p*Math.sin(th)];};
+  k.fillStyle=css("--line");k.beginPath();k.moveTo(x0,y0);k.lineTo(x1,y1);k.lineTo(x1,y0);k.closePath();k.fill();
+  k.strokeStyle=css("--ramp");k.lineWidth=3;k.beginPath();k.moveTo(x0,y0);k.lineTo(x1,y1);k.stroke();
+  k.fillStyle=css("--muted");k.font="12px system-ui";
+  for(let m=p0.origin-Math.floor(p0.origin/0.5+1e-9)*0.5;m<=L+1e-9;m+=0.5){const [px,py]=at(m);if(Math.abs(m-p0.origin)>0.01)k.fillText((+(p0.sgn*(m-p0.origin)).toFixed(2)).toString(),px-6+8*Math.sin(th),py+16);}
+  {const [ox,oy]=at(p0.origin);k.strokeStyle=css("--a");k.lineWidth=2;k.beginPath();k.moveTo(ox,oy+4);k.lineTo(ox,oy+26);k.stroke();k.fillStyle=css("--a");k.beginPath();k.arc(ox,oy,5,0,7);k.fill();k.font="bold 12px system-ui";k.fillText("x = 0",ox-14,oy+40);k.font="12px system-ui";}
+  k.fillStyle=css("--muted");k.fillText(Math.round(th*180/Math.PI)+"°",x1-30,y0-6);
+  {const [mx,my]=at(L*0.55);const s=p0.sgn,yy=60;k.save();k.translate(mx,my);k.rotate(-th);
+   k.strokeStyle=css("--x");k.fillStyle=css("--x");k.lineWidth=2.5;k.beginPath();k.moveTo(-35*s,yy);k.lineTo(35*s,yy);k.stroke();
+   k.beginPath();k.moveTo(43*s,yy);k.lineTo(34*s,yy-6);k.lineTo(34*s,yy+6);k.closePath();k.fill();
+   k.font="bold 12px system-ui";k.fillText("+x",s>0?48:-64,yy+4);k.restore();}
+  const [cx,cy]=at(st.x);
+  k.save();k.translate(cx,cy);k.rotate(-th);
+  const face=st.data.length&&Math.abs(st.v)>0.01?Math.sign(st.v):p0.dir;
+  k.fillStyle=css("--car");k.beginPath();k.roundRect(-22,-26,44,18,4);k.fill();
+  k.beginPath();k.roundRect(-14-6*face,-36,22,12,3);k.fill();
+  k.fillStyle="#ffd34d";k.beginPath();k.arc(21*face,-20,3,0,7);k.fill();
+  k.fillStyle=css("--text");k.beginPath();k.arc(-12,-6,6,0,7);k.arc(12,-6,6,0,7);k.fill();
+  const arrow=(val,yy,col,scale)=>{if(Math.abs(val)<0.01)return;const e=val*scale;k.strokeStyle=col;k.fillStyle=col;k.lineWidth=3;k.beginPath();k.moveTo(0,yy);k.lineTo(e,yy);k.stroke();const s=Math.sign(e);k.beginPath();k.moveTo(e+6*s,yy);k.lineTo(e-2*s,yy-6);k.lineTo(e-2*s,yy+6);k.closePath();k.fill();};
+  arrow(st.v,-48,css("--v"),22);arrow(st.a,-62,css("--a"),8);
+  k.restore();
+  if(st.held){k.font="bold 12px system-ui";k.fillStyle=css("--a");k.fillText("held still",cx-26,cy-60);}
+  legend(k,w);
+}
+
+function drawFall(){
+  const L=cf().L,p0=P();
+  const [k,w,h]=setup($("scene"),cf().h);
+  const yb=h-34,yt=46,pm=(yb-yt)/L,Y=m=>yb-m*pm,rx=52,cx=Math.round(w*0.5),R=11;
+  geo={mode:"fall",yb,pm};
+  k.fillStyle=css("--line");k.fillRect(0,yb,w,h-yb);
+  k.strokeStyle=css("--ramp");k.lineWidth=3;k.beginPath();k.moveTo(0,yb);k.lineTo(w,yb);k.stroke();
+  k.lineWidth=1.5;k.beginPath();k.moveTo(rx,yt);k.lineTo(rx,yb);k.stroke();
+  k.lineWidth=1;for(let m=0;m<=L;m++){const l=m%5===0?10:5;k.beginPath();k.moveTo(rx-l,Y(m));k.lineTo(rx,Y(m));k.stroke();}
+  k.fillStyle=css("--muted");k.font="12px system-ui";k.textAlign="right";
+  for(let m=p0.origin-Math.floor(p0.origin/5+1e-9)*5;m<=L+1e-9;m+=5){if(Math.abs(m-p0.origin)>0.01)k.fillText((+(p0.sgn*(m-p0.origin)).toFixed(1)).toString(),rx-13,Y(m)+4);}
+  k.textAlign="left";
+  const h0=+$("fH").value;
+  k.fillStyle=css("--ramp");k.globalAlpha=0.35;k.fillRect(cx-62,Y(h0),40,yb-Y(h0));k.globalAlpha=1;
+  k.strokeStyle=css("--ramp");k.lineWidth=2;k.beginPath();k.moveTo(cx-66,Y(h0));k.lineTo(cx-14,Y(h0));k.stroke();
+  {const oy=Y(p0.origin);k.strokeStyle=css("--a");k.lineWidth=1.5;k.setLineDash([5,4]);k.beginPath();k.moveTo(rx,oy);k.lineTo(w-70,oy);k.stroke();k.setLineDash([]);
+   k.fillStyle=css("--a");k.beginPath();k.arc(rx,oy,5,0,7);k.fill();k.font="bold 12px system-ui";k.textAlign="right";k.fillText("y = 0",rx-13,oy>yb-14?oy-8:oy+4);k.textAlign="left";k.font="12px system-ui";}
+  const by=Y(st.x)-R;
+  k.fillStyle=css("--car");k.beginPath();k.arc(cx,by,R,0,7);k.fill();
+  if(st.held){k.font="bold 12px system-ui";k.fillStyle=css("--a");k.fillText("held still",cx-26,by-20);}
+  const varrow=(ax,val,col,scale)=>{if(Math.abs(val)<0.01)return;const e=-val*scale;k.strokeStyle=col;k.fillStyle=col;k.lineWidth=3;k.beginPath();k.moveTo(ax,by);k.lineTo(ax,by+e);k.stroke();const s=Math.sign(e);k.beginPath();k.moveTo(ax,by+e+6*s);k.lineTo(ax-6,by+e-2*s);k.lineTo(ax+6,by+e-2*s);k.closePath();k.fill();};
+  varrow(cx+24,st.v,css("--v"),3);varrow(cx+42,st.a,css("--a"),4);
+  {const s=p0.sgn,ax=w-36,my=(yt+yb)/2;k.strokeStyle=css("--x");k.fillStyle=css("--x");k.lineWidth=2.5;k.beginPath();k.moveTo(ax,my+35*s);k.lineTo(ax,my-35*s);k.stroke();
+   k.beginPath();k.moveTo(ax,my-43*s);k.lineTo(ax-6,my-34*s);k.lineTo(ax+6,my-34*s);k.closePath();k.fill();
+   k.font="bold 12px system-ui";k.fillText("+y",ax-8,s>0?my-50:my+60);}
+  k.fillStyle=css("--muted");k.font="12px system-ui";k.fillText("ground",rx+8,yb+18);
+  legend(k,w,yb+14);
+}
+
+function plot(id,key,lo,hi,col){const val=d=>key==="x"?rel(d.x):P().sgn*d[key];
+  const [k,w,h]=setup($(id)),Lp=36,R=8,T=8,B=20,pw=w-Lp-R,ph=h-T-B;
+  const px=t=>Lp+t/TMAX*pw,py=y=>T+(hi-y)/(hi-lo)*ph;
+  k.strokeStyle=css("--line");k.lineWidth=1;k.fillStyle=css("--muted");k.font="11px system-ui";
+  for(let y=lo;y<=hi+1e-9;y+=(hi-lo)/4){k.beginPath();k.moveTo(Lp,py(y));k.lineTo(Lp+pw,py(y));k.stroke();k.fillText((+y.toFixed(1)).toString(),4,py(y)+4);}
+  const maj=TMAX<=2?0.5:TMAX<=6?1:TMAX<=12?2:5,mn=maj/(maj===5?5:2);
+  for(let t=0;t<=TMAX+1e-9;t+=mn){const isM=Math.abs(t/maj-Math.round(t/maj))<1e-6;k.strokeStyle=css("--line");k.globalAlpha=isM?1:0.5;k.beginPath();k.moveTo(px(t),T);k.lineTo(px(t),T+ph);k.stroke();k.globalAlpha=1;if(isM){const lab=(+t.toFixed(2)).toString();k.fillText(lab,px(t)-k.measureText(lab).width/2,h-5);}}
+  k.fillText("t (s)",Lp+pw-30,T+ph-6);
+  if(lo<0){k.strokeStyle=css("--muted");k.beginPath();k.moveTo(Lp,py(0));k.lineTo(Lp+pw,py(0));k.stroke();}
+  if(!st.data.length)return;
+  k.save();k.beginPath();k.rect(Lp-5,T-5,pw+10,ph+10);k.clip();
+  k.strokeStyle=col;k.lineWidth=2.5;k.beginPath();
+  st.data.forEach((d,i)=>{const X=px(d.t),Y=py(Math.max(lo,Math.min(hi,val(d))));i?k.lineTo(X,Y):k.moveTo(X,Y)});k.stroke();
+  const d=st.data[st.data.length-1];k.fillStyle=col;k.beginPath();k.arc(px(d.t),py(Math.max(lo,Math.min(hi,val(d)))),4,0,7);k.fill();k.restore();
+}
+
+function goLabel(){return mode==="ramp"?"Push":(+$("fPush").value===0?"Drop":"Throw");}
+
+function noteText(){
+  if(st.held){const o=cf().obj,A=cf().ax;return "You're holding the "+o+" still, but the clock keeps running. Watch the graphs: position is a flat horizontal line (it isn't changing), velocity is 0, and acceleration is 0. When you pressed Hold still, velocity dropped to 0 all at once. Press Let go and the "+o+" carries on exactly where it left off, with the same speed and direction it had before.";}
+  const c=cf(),p=P(),a=p.sgn*st.a,v=p.sgn*st.v,g0=p.sgn*accel(),A=c.ax,obj=c.obj,dirw=p.sgn>0?c.up:c.down;
+  if(!st.data.length){
+    if(mode==="ramp") return "Press Push. +x points "+dirw+". Gravity always pulls the car downhill, so with this choice the acceleration on the ramp is a = "+f2(g0)+" m/s²"+(Math.abs(g0)<0.005?".":(g0<0?" (negative, because downhill is the −x direction).":" (positive, because downhill is the +x direction)."));
+    return "Press "+goLabel()+". +y points "+dirw+". Gravity pulls the ball down with the same strength the whole time, so a = "+f2(g0)+" m/s²"+(g0<0?" (negative, because down is the −y direction).":" (positive, because down is the +y direction).");
+  }
+  if(st.done==="bottom"&&st.wasHeld){return "The "+cf().obj+" reached the "+(mode==="ramp"?"bottom":"ground")+" at t = "+st.t.toFixed(2)+" s. Read the graphs in pieces: while it moved, position was curved, velocity was a sloped line, and acceleration was "+f2(P().sgn*accel())+" m/s². While you held it, position was flat, and velocity and acceleration were both 0.";}
+  if(st.done==="bottom"){
+    if(mode==="ramp") return "The car reached the bottom of the ramp at t = "+st.t.toFixed(2)+" s, so the run ended. Look at the graphs: position is one smooth parabola, velocity is one straight line, and acceleration is one flat line the whole time.";
+    return "The ball hit the ground at t = "+st.t.toFixed(2)+" s, so the run ended. Position is one smooth parabola, velocity is one straight line, and acceleration is a flat line at "+f2(g0)+" m/s² the whole time, even at the top of a throw where v = 0.";
+  }
+  if(st.done==="top") return mode==="ramp"?"The car reached the top edge at t = "+st.t.toFixed(2)+" s, so the run ended. On a flat ramp nothing speeds it up or slows it down: velocity is a flat line, acceleration is 0, and position is a straight slanted line.":"The ball reached the top of the picture, so the run ended.";
+  if(st.done==="time") return "Time's up: the experiment time is set to "+TMAX+" s, so the run stopped there. Slide Experiment time to the right to let it run longer.";
+  if(Math.abs(a)<0.01) return "Flat ramp: acceleration is 0, so velocity stays constant (flat line) and position is a straight slanted line.";
+  let s="Acceleration is a constant "+(a>0?"positive":"negative")+" flat line (+"+A+" points "+dirw+"), so velocity is a straight sloped line and position is a parabola. ";
+  if(Math.abs(v)<=(mode==="fall"?0.25:0.02)) s+="Right now v ≈ 0: the "+obj+" is at its turning point"+(mode==="fall"?" (the top of its flight)":"")+", the tip of the position parabola (slope = 0). Acceleration is still not zero!";
+  else if((v>0)===(a>0)) s+="Right now v ("+f2(v)+") and a have the same sign, so the "+obj+" is speeding up.";
+  else s+="Right now v ("+f2(v)+") and a have opposite signs, so the "+obj+" is slowing down.";
+  return s;
+}
+
+function render(){
+  const c=cf();
+  $("rt").textContent=st.t.toFixed(2)+" s";$("rx").textContent=f2(rel(st.x))+" m";
+  $("rv").textContent=f2(P().sgn*st.v)+" m/s";$("ra").textContent=f2(P().sgn*st.a)+" m/s²";
+  if(mode==="ramp")$("x0Out").textContent=f2(rel(+$("x0").value))+" m";
+  else $("fHOut").textContent=(+$("fH").value).toFixed(1)+" m";
+  $("note").textContent=(st.paused?"Paused at t = "+st.t.toFixed(2)+" s. Press Resume to continue, or Reset to start over. ":"")+noteText();
+  if(mode==="ramp")drawRamp();else drawFall();
+  plot("gx","x",-c.rx,c.rx,css("--x"));plot("gv","v",-c.rv,c.rv,css("--v"));plot("ga","a",-c.ra,c.ra,css("--a"));
+}
+
+let last=0;
+function step(now){
+  if(!st.run)return;
+  const TOP=cf().TOP;
+  const dt=Math.min(0.05,(now-last)/1000);last=now;
+  if(st.held){st.v=0;st.a=0;st.t=Math.min(TMAX,st.t+dt);st.data.push({t:st.t,x:st.x,v:0,a:0});
+    if(st.t>=TMAX){st.run=false;st.done="time";updHold();$("go").textContent=goLabel();}
+    render();if(st.run)requestAnimationFrame(step);return;}
+  const a=accel();st.a=a;
+  let nx=st.x+st.v*dt+0.5*a*dt*dt,stop=false;
+  if(nx<=0){const tau=Math.abs(a)>1e-9?(-st.v-Math.sqrt(Math.max(0,st.v*st.v-2*a*st.x)))/a:-st.x/st.v;
+    const tt=Math.max(0,Math.min(dt,tau));st.v+=a*tt;st.x=0;st.t+=tt;stop=true;st.done="bottom";}
+  else if(nx>=TOP){const tt=Math.abs(a)<1e-9&&st.v>0?Math.min(dt,(TOP-st.x)/st.v):dt;st.x=TOP;st.v+=a*tt;st.t+=tt;stop=true;st.done="top";}
+  else{st.x=nx;st.v+=a*dt;st.t+=dt;if(st.t>=TMAX){stop=true;st.done="time";}}
+  st.data.push({t:st.t,x:st.x,v:st.v,a:st.a});
+  if(stop){st.run=false;$("go").textContent=goLabel();updHold();}
+  render();
+  if(st.run)requestAnimationFrame(step);
+}
+function reset(){st={t:0,x:+$(cf().x0).value,v:0,a:0,run:false,paused:false,held:false,data:[],done:""};updPush();$("go").textContent=goLabel();updHold();render();}
+function updHold(){const b=$("hold"),active=(st.run||st.paused)&&!st.done;b.disabled=!active;b.textContent=st.held?"Let go":"Hold still";b.classList.toggle("held",!!st.held&&active);}
+$("hold").onclick=()=>{
+  if(!((st.run||st.paused)&&!st.done))return;
+  if(!st.held){st.held=true;st.wasHeld=true;st.savedV=st.v;st.data.push({t:st.t,x:st.x,v:st.v,a:st.a});st.v=0;st.a=0;st.data.push({t:st.t,x:st.x,v:0,a:0});}
+  else{st.held=false;st.v=st.savedV||0;st.a=accel();st.data.push({t:st.t,x:st.x,v:0,a:0});st.data.push({t:st.t,x:st.x,v:st.v,a:st.a});}
+  updHold();render();
+};
+$("go").onclick=()=>{
+  if(st.run){st.run=false;st.paused=true;$("go").textContent="Resume";render();return;}
+  if(st.paused){st.paused=false;st.run=true;$("go").textContent="Pause";last=performance.now();render();requestAnimationFrame(step);return;}
+  reset();st.v=P().dir*(+$(cf().push).value);st.a=accel();st.run=true;
+  st.data.push({t:0,x:st.x,v:st.v,a:st.a});$("go").textContent="Pause";updHold();
+  last=performance.now();requestAnimationFrame(step);
+};
+$("reset").onclick=reset;
+$("tmax").oninput=()=>{TMAX=+$("tmax").value;$("tmaxOut").textContent=TMAX+" s";
+  if(st.t>=TMAX&&(st.run||st.paused)){st.t=Math.min(st.t,TMAX);st.run=false;st.paused=false;st.held=false;st.done="time";$("go").textContent=goLabel();updHold();}
+  render();};
+
+function maxPush(){const c=cf();if(P().dir<0)return c.cap;const a=Math.abs(accel());if(a<1e-9)return c.cap;
+  const v=Math.sqrt(Math.max(0,2*a*(c.TOP-(+$(c.x0).value))));return Math.min(c.cap,Math.floor(v*0.98*10)/10);}
+function updPush(){const c=cf(),m=maxPush(),el=$(c.push);el.max=m;if(+el.value>m)el.value=m;$(c.push+"Out").textContent=(+el.value).toFixed(1)+" m/s";
+  let msg="";
+  if(mode==="ramp"){if(P().dir>0)msg=+$("ang").value===0?"Flat ramp: nothing slows the car down, so it keeps the same speed until it reaches the top edge.":"Max "+m.toFixed(1)+" m/s so the car turns back before the top edge.";}
+  else{msg=+el.value===0?"0 m/s means you just let go (a drop). Slide right to throw.":(P().dir>0&&m<c.cap?"Max "+m.toFixed(1)+" m/s so the ball stays below 30 m.":"");}
+  $(c.pushMax).textContent=msg;}
+
+function setOrigin(v){const c=cf(),p=P();p.origin=Math.min(c.L,Math.max(0,Math.round(v/c.orgStep)*c.orgStep));$(c.org).value=p.origin;
+  $(c.orgOut).textContent=p.origin<1e-9?(mode==="ramp"?"bottom":"ground"):(mode==="ramp"?p.origin.toFixed(2)+" m up ramp":p.origin.toFixed(1)+" m up");render();}
+function setAxis(d){const c=cf();P().sgn=d;$(c.axU).classList.toggle("on",d>0);$(c.axD).classList.toggle("on",d<0);render();}
+function setDir(d){const c=cf();P().dir=d;$(c.dirU).classList.toggle("on",d>0);$(c.dirD).classList.toggle("on",d<0);if(!st.run)reset();}
+
+$("org").oninput=()=>setOrigin(+$("org").value);
+$("fOrg").oninput=()=>setOrigin(+$("fOrg").value);
+$("axUp").onclick=()=>setAxis(1);$("axDown").onclick=()=>setAxis(-1);
+$("fAxUp").onclick=()=>setAxis(1);$("fAxDown").onclick=()=>setAxis(-1);
+$("dirUp").onclick=()=>setDir(1);$("dirDown").onclick=()=>setDir(-1);
+$("fDirUp").onclick=()=>setDir(1);$("fDirDown").onclick=()=>setDir(-1);
+$("orgCar").onclick=()=>setOrigin(st.x);
+$("ang").oninput=()=>{$("angOut").textContent=$("ang").value+"°";if(!st.run)reset();};
+$("push").oninput=()=>{$("pushOut").textContent=(+$("push").value).toFixed(1)+" m/s";};
+$("fPush").oninput=()=>{if(!st.run)reset();};
+$("x0").oninput=()=>{if(!st.run)reset();};
+$("fH").oninput=()=>{if(!st.run)reset();};
+
+function setMode(m){
+  st.run=false;mode=m;
+  $("mRamp").classList.toggle("on",m==="ramp");$("mFall").classList.toggle("on",m==="fall");
+  document.querySelectorAll(".rampOnly").forEach(e=>e.style.display=m==="ramp"?"":"none");
+  document.querySelectorAll(".fallOnly").forEach(e=>e.style.display=m==="fall"?"":"none");
+  $("title").textContent=cf().title;$("sub").textContent=cf().sub;
+  $("glx").textContent="Position "+cf().ax+" (m) vs time";
+  $("orgCar").textContent="Set origin at "+cf().obj;
+  reset();
+}
+$("mRamp").onclick=()=>setMode("ramp");$("mFall").onclick=()=>setMode("fall");
+
+let dragging=false;
+const scene=$("scene");
+function placeAt(e){
+  if(!geo)return;
+  const r=scene.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+  if(geo.mode==="ramp"){
+    const p=(px-geo.x0)*Math.cos(geo.th)+(geo.y0-py)*Math.sin(geo.th);
+    $("x0").value=Math.round(Math.max(0.1,Math.min(1.9,p/geo.tl*2))*20)/20;
+  }else{
+    $("fH").value=Math.round(Math.max(0,Math.min(20,(geo.yb-py-11)/geo.pm))*2)/2;
+  }
+  reset();
+}
+scene.addEventListener("pointerdown",e=>{st.run=false;st.paused=false;st.held=false;dragging=true;scene.setPointerCapture(e.pointerId);placeAt(e);});
+scene.addEventListener("pointermove",e=>{if(dragging)placeAt(e);});
+scene.addEventListener("pointerup",()=>{dragging=false;});
+window.addEventListener("resize",render);
+if(!CanvasRenderingContext2D.prototype.roundRect){CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h){this.rect(x,y,w,h)};}
+setMode("ramp");
+</script>
+</body>
+</html>
